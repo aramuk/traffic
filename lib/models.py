@@ -10,23 +10,6 @@ from . import logs
 
 logger = logs.get_logger()
 
-
-class STGCN(nn.Module):
-    def __init__(self, Ks, Kt, hist_size, blocks) -> None:
-        super(STGCN, self).__init__()
-        Ko = hist_size
-        self.encoder = nn.Sequential(
-            *(layers.SpatioTemporalConv(Ks, Kt, channels, 0.1, act='glu') for channels in blocks[:-1])
-        )
-        Ko -= len(blocks) * 2 * (Ks - 1)
-        self.classifier = layers.Classifier(blocks[-1], Ko, act='glu')
-
-    def forward(self, x, edge_idx, edge_wt):
-        features = self.classifier(x, edge_idx, edge_wt)
-        y = self.classifier(features)
-        return y
-
-
 class STGCN_VAE(nn.Module):
     def __init__(
         self, Ks: int, Kt: int, hist_window: int, pred_window: int, encoder_blocks: List[int],

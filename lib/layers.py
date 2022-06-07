@@ -16,6 +16,7 @@ ACTIVATION_FNS = {
 
 logger = logs.get_logger()
 
+
 class Align(nn.Module):
     def __init__(self, in_channels, out_channels) -> None:
         super(Align, self).__init__()
@@ -27,7 +28,7 @@ class Align(nn.Module):
         if self.in_channels > self.out_channels:
             out = torch.permute(x, (0, 3, 1, 2))
             out = self.conv(out)
-            return torch.permute(out, (0, 2 , 3, 1))
+            return torch.permute(out, (0, 2, 3, 1))
         elif self.in_channels < self.out_channels:
             batch_size, T, N, _ = x.shape
             return torch.cat((x, torch.zeros(batch_size, T, N, self.out_channels - self.in_channels)), dim=3)
@@ -100,23 +101,6 @@ class SpatioTemporalConv(nn.Module):
         x_out = self.norm(x_out)
         x_out = self.dropout(x_out)
         logger.debug("Out of ST block: %s", x_out.shape)
-        return x_out
-
-
-class Classifier(nn.Module):
-    def __init__(self, channels: int, kernel_size: int, act: str) -> None:
-        super(Classifier, self).__init__()
-        self.temporal_conv1 = TemporalConv(channels, channels, kernel_size, act)
-        self.norm = nn.LayerNorm(channels)
-        self.temporal_conv2 = TemporalConv(channels, channels, 1, 'sigmoid')
-        self.conv = nn.Conv2d(channels, 1, kernel_size=1, stride=1, padding='same')
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x_out = x
-        x_out = self.temporal_conv1(x_out)
-        x_out = self.norm(x_out)
-        x_out = self.temporal_conv2(x_out)
-        x_out = self.conv(x_out)
         return x_out
 
 
