@@ -1,5 +1,5 @@
 import os
-from typing import Tuple
+from typing import Tuple, Optional
 
 import contextily as cx
 import geopandas
@@ -14,7 +14,7 @@ from torch.utils.data import Dataset
 class PEMSBay(Dataset):
     split_sizes: Tuple[float] = (0.70, 0.15, 0.15)
 
-    def __init__(self, data_dir: str, split: str, n_hist: int, n_pred: int):
+    def __init__(self, data_dir: str, split: str, hist_window: int, pred_window: int, threshold: Optional[float] = 0.1):
         if split not in ('train', 'val', 'test'):
             raise ValueError(f"Split must be one of 'train','val','test'. Received '{split}'")
         self.data_dir = data_dir
@@ -22,18 +22,19 @@ class PEMSBay(Dataset):
         sensors_file = os.path.join(data_dir, 'sensor_locations.csv')
         traffic_file = os.path.join(data_dir, 'traffic.h5')
         data_file = os.path.join(self.data_dir, f"{split}.h5")
-        if not all(os.path.exists(f) for f in (dist_file, sensors_file, traffic_file, data_file)):
+        if not all(os.path.exists(f) for f in (dist_file, sensors_file, traffic_file)):
             raise FileNotFoundError(f"Missing dataset files: {dist_file}, {sensors_file}, or {traffic_file}")
 
         self.dist_df = pd.read_csv(dist_file, names=['from', 'to', 'distance'])
         self.sensors_df = pd.read_csv(sensors_file, names=['sensor_id', 'latitude', 'longitude'])
-        self.adj = self._get_adj_mx(self.sensors_df.sensor_id.unique(), self.dist_df)
+        self.adj = self._get_adj_mx(self.sensors_df.sensor_id.unique(), self.dist_df, threshold)
+        self.num_vertices = self.adj.shape[0]
         self.edge_idx, self.edge_wt = self._get_edges(self.adj)
 
         if not os.path.exists(data_file):
             self._generate_splits(traffic_file)
         train_set = pd.read_hdf(data_file).values
-        self._create_windows(train_set, n_hist, n_pred, self.adj.shape[0])
+        self._create_windows(train_set, hist_window, pred_window)
 
     def display(self, idx: int = None):
         sensors_gdf = geopandas.GeoDataFrame(
@@ -50,7 +51,7 @@ class PEMSBay(Dataset):
         plt.show()
 
     @staticmethod
-    def _get_adj_mx(sensor_ids, distance_df):
+    def _get_adj_mx(sensor_ids, distance_df, threshold):
         """Creates an adjacency matrix from a DataFrame of distances.
         
         Adapted from: https://github.com/dmlc/dgl/blob/master/examples/pytorch/stgcn_wave/sensors2graph.py
@@ -69,23 +70,22 @@ class PEMSBay(Dataset):
         stddev = dists[~np.isinf(dists)].std()
         adj = np.exp(-(dists / stddev)**2)
         # Zero out any small values to make `adj` sparse
-        adj[adj < K] = 0
+        adj[adj < threshold] = 0
         # Sparsify and Symmetrize
         adj = coo_matrix(adj)
         adj = (adj + adj.T) / 2
         return adj
 
-    @staticmethod
-    def _get_edges(adj):
+    def _get_edges(self, adj):
         edge_idx = []
         edge_wt = []
-        for i in range(v):
-            for j in range(v):
+        for i in range(self.num_vertices):
+            for j in range(self.num_vertices):
                 if adj[i, j] > 0:
                     edge_idx.append((i, j))
                     edge_wt.append(adj[i, j])
-        edge_idx = torch.tensor(edge_idx).t().contiguous().long()
-        edge_wt = torch.tensor(edge_wt)
+        edge_idx = torch.tensor(edge_idx, dtype=torch.long).t().contiguous()
+        edge_wt = torch.tensor(edge_wt,  dtype=torch.float)
         return edge_idx, edge_wt
 
     def _generate_splits(self, traffic_file):
@@ -98,20 +98,20 @@ class PEMSBay(Dataset):
         for split in ('train', 'val', 'test'):
             eval(split).to_hdf(os.path.join(self.data_dir, f"{split}.h5"), key=f"{split}_data", index=False)
 
-    def _create_windows(self, X_raw: np.ndarray, hist_window: int, pred_window: int, n: int):
-        m,_ = X_raw.shape
+    def _create_windows(self, X_raw: np.ndarray, hist_window: int, pred_window: int):
+        m, _ = X_raw.shape
         n_windows = m // (hist_window + pred_window)
-        self.X = np.zeros((n_windows, hist_window, n))
-        self.y = np.zeros((n_windows, pred_window, n))
+        self.X = torch.zeros((n_windows, self.num_vertices, hist_window))
+        self.y = torch.zeros((n_windows, self.num_vertices, pred_window))
         for i in range(n_windows):
-            start =  i * (hist_window + pred_window)
+            start = i * (hist_window + pred_window)
             train_end = start + hist_window
             pred_end = train_end + pred_window
-            self.X[i,:] = X_raw[start:train_end].reshape(1, hist_window, n)
-            self.y[i,:] = X_raw[train_end:pred_end]
+            self.X[i, :] = torch.tensor(X_raw[start:train_end].T)
+            self.y[i, :] = torch.tensor(X_raw[train_end:pred_end].T)
 
     def __len__(self):
         return self.X.shape[0]
 
     def __getitem__(self, idx):
-        return self.X[idx,:], self.y[idx,:]
+        return self.X[idx, :].reshape(1, self.num_vertices, -1), self.y[idx, :].reshape(1, self.num_vertices, -1)
