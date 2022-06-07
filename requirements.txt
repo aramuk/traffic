@@ -1,6 +1,7 @@
 contextily==1.2.0
 geopandas==0.10.2
 matplotlib==3.4.3
+networkx==2.5.1
 pandas==1.2.3
 scipy==1.6.2
 torch==1.11.0

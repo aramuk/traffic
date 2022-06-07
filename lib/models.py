@@ -10,6 +10,7 @@ from . import logs
 
 logger = logs.get_logger()
 
+
 class STGCN(nn.Module):
     def __init__(self, Ks, Kt, hist_size, blocks) -> None:
         super(STGCN, self).__init__()
@@ -80,14 +81,14 @@ class STGCN_VAE(nn.Module):
     ) -> torch.Tensor:
         z = self.reparametrize(mu, std)
         logger.debug("Latent variable, z: %s", z.shape)
-        # x_start_decoder
+        # Experiment: x_start_decoder
         y_hat = torch.cat((z, x), axis=-1)
-        # x_all_decoder
+        # Experiment: x_all_decoder
         # y_hat = z
         for block in self.decoder:
-            # x_start_decoder
+            # Experiment: x_start_decoder
             y_hat = block(y_hat, edge_idx, edge_wt)
-            # x_all_decoder
+            # Experiment: x_all_decoder
             # recon = torch.cat((y_hat, x), axis=-1)
             # y_hat = block(recon, edge_idx, edge_wt)
         return y_hat
