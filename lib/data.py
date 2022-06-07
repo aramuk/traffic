@@ -14,7 +14,7 @@ from torch.utils.data import Dataset
 class PEMSBay(Dataset):
     split_sizes: Tuple[float] = (0.70, 0.15, 0.15)
 
-    def __init__(self, data_dir: str, split: str, window_size):
+    def __init__(self, data_dir: str, split: str, n_hist: int, n_pred: int):
         if split not in ('train', 'val', 'test'):
             raise ValueError(f"Split must be one of 'train','val','test'. Received '{split}'")
         self.data_dir = data_dir
@@ -32,7 +32,8 @@ class PEMSBay(Dataset):
 
         if not os.path.exists(data_file):
             self._generate_splits(traffic_file)
-        self.data = pd.read_hdf(data_file).values
+        train_set = pd.read_hdf(data_file).values
+        self._create_windows(train_set, n_hist, n_pred, self.adj.shape[0])
 
     def display(self, idx: int = None):
         sensors_gdf = geopandas.GeoDataFrame(
@@ -97,11 +98,20 @@ class PEMSBay(Dataset):
         for split in ('train', 'val', 'test'):
             eval(split).to_hdf(os.path.join(self.data_dir, f"{split}.h5"), key=f"{split}_data", index=False)
 
-    def _transform(self):
-        pass
+    def _create_windows(self, X_raw: np.ndarray, hist_window: int, pred_window: int, n: int):
+        m,_ = X_raw.shape
+        n_windows = m // (hist_window + pred_window)
+        self.X = np.zeros((n_windows, hist_window, n))
+        self.y = np.zeros((n_windows, pred_window, n))
+        for i in range(n_windows):
+            start =  i * (hist_window + pred_window)
+            train_end = start + hist_window
+            pred_end = train_end + pred_window
+            self.X[i,:] = X_raw[start:train_end].reshape(1, hist_window, n)
+            self.y[i,:] = X_raw[train_end:pred_end]
 
     def __len__(self):
-        pass
+        return self.X.shape[0]
 
-    def __getitem__(self):
-        pass
+    def __getitem__(self, idx):
+        return self.X[idx,:], self.y[idx,:]
