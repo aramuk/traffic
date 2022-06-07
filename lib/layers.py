@@ -1,10 +1,11 @@
-import logging
 from typing import Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, ChebConv
+
+from . import logs
 
 ACTIVATION_FNS = {
     'glu': F.glu,
@@ -13,8 +14,7 @@ ACTIVATION_FNS = {
     'sigmoid': F.sigmoid,
 }
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("traffic")
+logger = logs.get_logger()
 
 class Align(nn.Module):
     def __init__(self, in_channels, out_channels) -> None:

@@ -10,5 +10,5 @@ Traffic prediction on the PEMS-BAY dataset.
 
 | Experiment | MAE (val) | RMSE (val) | MAE (test) | RMSE (test) |
 |---|---|---|---|---|
-| `loss_x_all_decoder`  |  1.63 |  2.8928 | - | - |
-| `loss_x_first_decoder`  | - | - | - | - |
+| `loss_x_all_decoder`  |  1.6234 |  2.8928 | - | - |
+| `loss_x_first_decoder`  | 1.5955 | 2.8478 | - | - |
