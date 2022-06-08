@@ -10,6 +10,7 @@ from . import logs
 
 logger = logs.get_logger()
 
+
 class STGCN_VAE(nn.Module):
     def __init__(
         self, Ks: int, Kt: int, hist_window: int, pred_window: int, encoder_blocks: List[int],
@@ -24,16 +25,14 @@ class STGCN_VAE(nn.Module):
         self.gconv_var = GCNConv(out_channels, 1, cached=True, improved=True)
 
         decoder_blocks[0] += hist_window  # x_start_decoder
-        _dec_layers = [
-            layers.ResidualGConv(
-                decoder_blocks[i],  # x_start_decoder: + hist_window, 
-                decoder_blocks[i + 1],
-                'relu'
-            ) for i in range(len(decoder_blocks) - 1)
-        ]
         self.decoder = nn.ModuleList(
             [
-                *_dec_layers,
+                layers.ResidualGConv(
+                    decoder_blocks[i],  # x_start_decoder: + hist_window, 
+                    decoder_blocks[i + 1],
+                    'relu'
+                ) for i in range(len(decoder_blocks) - 1)
+            ] + [
                 layers.ResidualGConv(
                     decoder_blocks[-1],  # x_start_decoder: + hist_window,
                     pred_window,

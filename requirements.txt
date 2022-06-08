@@ -1,5 +1,6 @@
 contextily==1.2.0
 geopandas==0.10.2
+imageio==2.9.0
 matplotlib==3.4.3
 networkx==2.5.1
 pandas==1.2.3

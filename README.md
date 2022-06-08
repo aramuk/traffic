@@ -1,6 +1,8 @@
 # Traffic
 
-Traffic prediction on the PEMS-BAY dataset.
+Traffic prediction on the PEMS-BAY dataset using a spatio-temporal graph convolutional variational autoencoder.
+
+![Visualized predictions](https://github.com/aramuk/traffic/blob/main/figures/predictions.gif)
 
 ## Installation
 
